@@ -1,4 +1,6 @@
 <?php
+namespace PHPResque;
+
 /**
  * Redisent, a Redis interface for the modest
  * @author Justin Poliey <jdp34@njit.edu>
@@ -92,7 +94,7 @@ class RedisentCluster {
 			return $this->aliases[$alias];
 		}
 		else {
-			throw new Exception("That Redisent alias does not exist");
+			throw new \Exception("That Redisent alias does not exist");
 		}
 	}
 

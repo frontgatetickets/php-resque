@@ -1,4 +1,6 @@
 <?php
+namespace PHPResque;
+
 /**
  * Resque statistic management (jobs processed, failed, etc)
  *

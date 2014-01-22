@@ -1,4 +1,7 @@
 <?php
+
+namespace PHPResque;
+
 /**
  * Redis backend for storing failed Resque jobs.
  *

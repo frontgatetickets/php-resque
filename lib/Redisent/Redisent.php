@@ -1,4 +1,7 @@
 <?php
+
+namespace PHPResque;
+
 /**
  * Redisent, a Redis interface for the modest
  * @author Justin Poliey <jdp34@njit.edu>
@@ -13,8 +16,9 @@ define('CRLF', sprintf('%s%s', chr(13), chr(10)));
  * Wraps native Redis errors in friendlier PHP exceptions
  * Only declared if class doesn't already exist to ensure compatibility with php-redis
  */
-if (! class_exists('RedisException', false)) {
-    class RedisException extends Exception {
+if (!class_exists('RedisException', false)) {
+    class RedisException extends \Exception
+    {
     }
 }
 
@@ -45,6 +49,13 @@ class Redisent {
     public $port;
 
     /**
+     * Number of times to attempt a reconnect
+     *
+     * @var int
+     */
+    public $max_reconnects = 3;
+
+    /**
      * Creates a Redisent connection to the Redis server on host {@link $host} and port {@link $port}.
      * @param string $host The hostname of the Redis server
      * @param integer $port The port number of the Redis server
@@ -58,7 +69,7 @@ class Redisent {
     function establishConnection() {
         $this->__sock = fsockopen($this->host, $this->port, $errno, $errstr);
         if (!$this->__sock) {
-            throw new Exception("{$errno} - {$errstr}");
+            throw new \Exception("{$errno} - {$errstr}");
         }
     }
 
@@ -73,10 +84,18 @@ class Redisent {
         $command = sprintf('*%d%s%s%s', count($args), CRLF, implode(array_map(array($this, 'formatArgument'), $args), CRLF), CRLF);
 
         /* Open a Redis connection and execute the command */
+        $reconnects = 0;
         for ($written = 0; $written < strlen($command); $written += $fwrite) {
-            $fwrite = fwrite($this->__sock, substr($command, $written));
-            if ($fwrite === FALSE) {
-                throw new Exception('Failed to write entire command to stream');
+            $fwrite = @fwrite($this->__sock, substr($command, $written));
+            if ($fwrite === false || $fwrite === 0) {
+                if ($reconnects >= (int)$this->max_reconnects) {
+                    throw new \Exception('Failed to write entire command to stream');
+                } else {
+                    fclose($this->__sock);
+                    sleep(1);
+                    $this->establishConnection();
+                    $reconnects++;
+                }
             }
         }
 

@@ -1,4 +1,7 @@
 <?php
+
+namespace PHPResque;
+
 // Third- party apps may have already loaded Resident from elsewhere
 // so lets be careful.
 if(!class_exists('RedisentCluster', false)) {

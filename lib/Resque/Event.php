@@ -1,4 +1,5 @@
 <?php
+namespace PHPResque;
 /**
  * Resque event/plugin system class
  *

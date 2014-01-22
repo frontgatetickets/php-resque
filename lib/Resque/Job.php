@@ -1,4 +1,7 @@
 <?php
+
+namespace PHPResque;
+
 require_once dirname(__FILE__) . '/Event.php';
 require_once dirname(__FILE__) . '/Job/Status.php';
 require_once dirname(__FILE__) . '/Job/DontPerform.php';
@@ -143,19 +146,24 @@ class Resque_Job
 			return $this->instance;
 		}
 
-		if(!class_exists($this->payload['class'])) {
-			throw new Resque_Exception(
-				'Could not find job class ' . $this->payload['class'] . '.'
-			);
+		if (class_exists('Resque_Job_Creator')) {
+			$this->instance = Resque_Job_Creator::createJob($this->payload['class'], $this->getArguments());
+		} else {
+			if (!class_exists($this->payload['class'])) {
+				throw new Resque_Exception(
+				    'Could not find job class ' . $this->payload['class'] . '.'
+				);
+			}
+
+			if (!method_exists($this->payload['class'], 'perform')) {
+				throw new Resque_Exception(
+				    'Job class ' . $this->payload['class'] . ' does not contain a perform method.'
+				);
+			}
+			$this->instance = new $this->payload['class']();
 		}
 
-		if(!method_exists($this->payload['class'], 'perform')) {
-			throw new Resque_Exception(
-				'Job class ' . $this->payload['class'] . ' does not contain a perform method.'
-			);
-		}
-
-		$this->instance = new $this->payload['class']();
+		$this->instance->jobId = $this->payload['id'];
 		$this->instance->job = $this;
 		$this->instance->args = $this->getArguments();
 		$this->instance->queue = $this->queue;
@@ -241,17 +249,14 @@ class Resque_Job
 	 */
 	public function __toString()
 	{
-		$name = array(
-			'Job{' . $this->queue .'}'
+		return json_encode(
+			array(
+				'queue' => $this->queue,
+				'id' => !empty($this->payload['id']) ? $this->payload['id'] : '',
+				'class' => $this->payload['class'],
+				'args' => !empty($this->payload['args']) ? $this->payload['args'] : ''
+			)
 		);
-		if(!empty($this->payload['id'])) {
-			$name[] = 'ID: ' . $this->payload['id'];
-		}
-		$name[] = $this->payload['class'];
-		if(!empty($this->payload['args'])) {
-			$name[] = json_encode($this->payload['args']);
-		}
-		return '(' . implode(' | ', $name) . ')';
 	}
 }
 ?>

@@ -1,4 +1,7 @@
 <?php
+
+namespace PHPResque;
+
 /**
  * Status tracker/information for a job.
  *

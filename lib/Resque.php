@@ -1,4 +1,8 @@
 <?php
+namespace PHPResque;
+
+use Fgs\Exception\DeveloperException;
+
 require_once dirname(__FILE__) . '/Resque/Event.php';
 require_once dirname(__FILE__) . '/Resque/Exception.php';
 
@@ -23,6 +27,13 @@ class Resque
 	 * array of server swith host/port pairs
 	 */
 	protected static $redisServer = null;
+
+
+	/**
+	 * Selected redis server that we have connected to.
+	 * @var mixed
+	 */
+	protected static $selectedRedisServer = null;
 
 	/**
 	 * @var int ID of Redis database to select.
@@ -69,27 +80,27 @@ class Resque
 			return self::$redis;
 		}
 
-		$server = self::$redisServer;
-		if (empty($server)) {
-			$server = 'localhost:6379';
+		$servers = self::$redisServer;
+		if(is_array($servers)) {
+			if(count($servers) == 0) {
+				throw new DeveloperException('We are experiencing technical difficulties.  Please try again.', array('dev_message'=>'All redis servers are down.'));
+			}
+			shuffle($servers); // we'll randomly pick a server.
+			$server = array_pop($servers);
+		} else {
+			list($server['host'], $server['port']) = explode(':', $servers);
 		}
 
-		if(is_array($server)) {
-			require_once dirname(__FILE__) . '/Resque/RedisCluster.php';
-			self::$redis = new Resque_RedisCluster($server);
-		}
-		else {
-			if (strpos($server, 'unix:') === false) {
-				list($host, $port) = explode(':', $server);
-			}
-			else {
-				$host = $server;
-				$port = null;
-			}
-			require_once dirname(__FILE__) . '/Resque/Redis.php';
-			self::$redis = new Resque_Redis($host, $port);
-		}
+		require_once dirname(__FILE__) . '/Resque/Redis.php';
 
+		try {
+			self::$redis = new Resque_Redis($server['host'], $server['port']);
+			self::$selectedRedisServer =  $server;
+		} catch (\Exception $e) {
+			// If we can't connect, fall back to the next server.
+			self::$redisServer = $servers; // array of servers minus the one we just popped off.
+			return self::redis();
+		}
 		self::$redis->select(self::$redisDatabase);
 		return self::$redis;
 	}
@@ -186,4 +197,13 @@ class Resque
 		}
 		return $queues;
 	}
+
+	/**
+	 * @return mixed
+	 */
+	public static function getSelectedRedisServer()
+	{
+		return self::$selectedRedisServer;
+	}
+
 }

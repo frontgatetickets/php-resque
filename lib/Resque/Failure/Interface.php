@@ -1,4 +1,6 @@
 <?php
+namespace PHPResque;
+
 /**
  * Interface that all failure backends should implement.
  *

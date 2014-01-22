@@ -1,4 +1,7 @@
 <?php
+
+namespace PHPResque;
+
 $QUEUE = getenv('QUEUE');
 if(empty($QUEUE)) {
 	die("Set QUEUE env var containing the list of queues to work.\n");
@@ -6,21 +9,25 @@ if(empty($QUEUE)) {
 
 require_once 'lib/Resque.php';
 require_once 'lib/Resque/Worker.php';
+require_once 'lib/Resque/WorkerJobsPerFork.php';
+require_once 'lib/Resque/Redis.php';
 
 $REDIS_BACKEND = getenv('REDIS_BACKEND');
-if(!empty($REDIS_BACKEND)) {
-	Resque::setBackend($REDIS_BACKEND);
+if (!empty($REDIS_BACKEND)) {
+    list($server['host'], $server['port']) = explode(':', $REDIS_BACKEND);
+    Resque::setBackend(array($server));
 }
 
 $logLevel = 0;
 $LOGGING = getenv('LOGGING');
 $VERBOSE = getenv('VERBOSE');
 $VVERBOSE = getenv('VVERBOSE');
-if(!empty($LOGGING) || !empty($VERBOSE)) {
-	$logLevel = Resque_Worker::LOG_NORMAL;
-}
-else if(!empty($VVERBOSE)) {
-	$logLevel = Resque_Worker::LOG_VERBOSE;
+if (!empty($LOGGING) || !empty($VERBOSE)) {
+    $logLevel = Resque_WorkerJobsPerFork::LOG_NORMAL;
+} else {
+    if (!empty($VVERBOSE)) {
+        $logLevel = Resque_WorkerJobsPerFork::LOG_VERBOSE;
+    }
 }
 
 $APP_INCLUDE = getenv('APP_INCLUDE');
@@ -36,6 +43,18 @@ $interval = 5;
 $INTERVAL = getenv('INTERVAL');
 if(!empty($INTERVAL)) {
 	$interval = $INTERVAL;
+}
+
+$jobs_per_fork = 1;
+$JOBS_PER_FORK = getenv('JOBS_PER_FORK');
+if (!empty($JOBS_PER_FORK) && $JOBS_PER_FORK > 1) {
+	$jobs_per_fork = $JOBS_PER_FORK;
+}
+
+$PREFIX = getenv('PREFIX');
+if(!empty($PREFIX)) {
+	//$logger->log(Psr\Log\LogLevel::INFO, 'Prefix set to {prefix}', array('prefix' => $PREFIX));
+	RedisApi::$defaultNamespace = $PREFIX . ':';
 }
 
 $count = 1;
@@ -64,7 +83,7 @@ if($count > 1) {
 // Start a single worker
 else {
 	$queues = explode(',', $QUEUE);
-	$worker = new Resque_Worker($queues);
+	$worker = new Resque_WorkerJobsPerFork($queues, $JOBS_PER_FORK);
 	$worker->logLevel = $logLevel;
 	
 	$PIDFILE = getenv('PIDFILE');
